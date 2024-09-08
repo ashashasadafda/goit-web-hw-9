@@ -25,20 +25,37 @@ def scrape_quotes(url):
         else:
             url = None
 
-    return quotes
+    return quotes, soup
 
 
-def scrape_authors(quotes):
-    authors = {}
-    for quote in quotes:
-        author_name = quote['author']
-        if author_name not in authors:
-            authors[author_name] = {
+def scrape_author_bio(author_url):
+    response = requests.get(BASE_URL + author_url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    born_date = soup.find('span', class_='author-born-date').text
+    born_location = soup.find('span', class_='author-born-location').text
+    description = soup.find('div', class_='author-description').text.strip()
+
+    return {
+        'born_date': born_date,
+        'born_location': born_location,
+        'description': description
+    }
+
+
+def scrape_authors(quotes, soup):
+    authors = []
+    author_names = set()
+    for quote in soup.find_all('div', class_='quote'):
+        author_name = quote.find('small', class_='author').text
+        if author_name not in author_names:
+            author_names.add(author_name)
+            author_url = quote.find('a')['href']
+            bio_data = scrape_author_bio(author_url)
+            authors.append({
                 'name': author_name,
-                'description': None,  # Ви можете додати логіку для отримання опису автора, якщо він доступний на сайті
-                'born_date': None,
-                'born_location': None
-            }
+                'description': bio_data['description']
+            })
     return authors
 
 
@@ -48,8 +65,8 @@ def save_to_json(data, filename):
 
 
 if __name__ == "__main__":
-    quotes = scrape_quotes(BASE_URL)
-    authors = scrape_authors(quotes)
+    quotes, soup = scrape_quotes(BASE_URL)
+    authors = scrape_authors(quotes, soup)
 
     save_to_json(quotes, 'quotes.json')
     save_to_json(authors, 'authors.json')
